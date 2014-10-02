@@ -81,6 +81,7 @@ end;
 define function find-user
     (name :: <string>, #key default)
  => (user :: false-or(<wiki-user>))
+  log-info("%= in %=", name, *users*);
   element(*users*, name, default: default)
 end;
 
@@ -155,8 +156,10 @@ end;
 //       and redirect to a login page.
 define function check-authorization
     () => (user :: false-or(<wiki-user>))
+  log-info("check-authorization");
   let authorization = get-header(current-request(), "Authorization", parsed: #t);
   if (authorization)
+    log-info("inside authorization");
     let name = head(authorization);
     let pass = tail(authorization);
     let user = find-user(name);
@@ -170,6 +173,7 @@ end function check-authorization;
 
 define function authenticate
     () => (user :: false-or(<wiki-user>))
+  log-info("authenticate");
   let user = check-authorization();
   if (user)
     *authenticated-user*
@@ -183,9 +187,10 @@ end function authenticate;
 define function require-authorization
     (#key realm :: false-or(<string>))
   let realm = realm | *default-authentication-realm*;
-  let headers = current-response().raw-headers;
-  set-header(headers, "WWW-Authenticate", concatenate("Basic realm=\"", realm, "\""));
-  unauthorized-error(headers: headers);
+  let response :: <response> = current-response();
+  //let headers = response-headers(response);
+  set-header(response, "WWW-Authenticate", concatenate("Basic realm=\"", realm, "\""));
+  unauthorized-error(headers: response-headers(response));
 end;
 
 define wf/object-test (user) in wiki end;
@@ -418,7 +423,7 @@ define method respond-to-post
             end;
           end;
         end if;
-    if (user & ~page-has-errors?())
+    if (#f & user & ~page-has-errors?())
       // Hannes commented in IRC 2009-06-12: this will probably block
       // the responder thread while the mail is being delivered; and
       // to circumvent greylisting you've to wait 5-10 minutes between
